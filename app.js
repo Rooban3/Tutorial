@@ -1,70 +1,333 @@
-const $=s=>document.querySelector(s),today=new Date().toISOString().slice(0,10),inr=n=>'₹'+n.toLocaleString('en-IN');
-const seed={buses:[
-{id:'B1',name:'Kaveri Express',type:'AC Sleeper',owner:'Kaveri Travels',from:'Chennai',to:'Bengaluru',board:'Koyambedu',drop:'Majestic',dep:'22:00',dur:390,price:950,seats:32,on:1},
-{id:'B2',name:'Southern Star',type:'AC Seater',owner:'Star Lines',from:'Chennai',to:'Bengaluru',board:'Guindy',drop:'Silk Board',dep:'07:30',dur:360,price:720,seats:40,on:1},
-{id:'B3',name:'Pandian Sleeper',type:'Non-AC Sleeper',owner:'Pandian Bros',from:'Chennai',to:'Madurai',board:'Koyambedu',drop:'Mattuthavani',dep:'21:15',dur:480,price:800,seats:30,on:1},
-{id:'B4',name:'Kovai Comfort',type:'Non-AC Seater',owner:'Kovai Motors',from:'Chennai',to:'Coimbatore',board:'Koyambedu',drop:'Gandhipuram',dep:'20:00',dur:450,price:650,seats:40,on:1},
-{id:'B5',name:'Deccan Royal',type:'AC Sleeper',owner:'Deccan Travels',from:'Bengaluru',to:'Hyderabad',board:'Madiwala',drop:'LB Nagar',dep:'20:30',dur:600,price:1400,seats:32,on:1}],
-bookings:[],notes:[],users:[]};
-let DB;try{DB=JSON.parse(localStorage.getItem('yd'))||seed}catch(e){DB=seed}
-const save=()=>{try{localStorage.setItem('yd',JSON.stringify(DB))}catch(e){}};
-let S={view:'home',q:{from:'Chennai',to:'Bengaluru',date:today,n:1},sel:[],bus:null,pax:[],f:{},user:null,admin:false,atab:'ov',tab:'up',last:null,fail:0};
-const go=v=>{S.view=v;render();scrollTo(0,0)};
-function toast(m,u){if(u!==false&&S.user)DB.notes.unshift({u:S.user.email,m,t:new Date().toLocaleString()});save();const e=document.createElement('div');e.className='toast';e.setAttribute('role','status');e.textContent=m;document.body.append(e);setTimeout(()=>e.remove(),3500)}
-const arr=(b)=>{const[h,m]=b.dep.split(':').map(Number),t=(h*60+m+b.dur)%1440;return String(t/60|0).padStart(2,'0')+':'+String(t%60).padStart(2,'0')};
-const taken=(id,d)=>DB.bookings.filter(x=>x.bus==id&&x.date==d&&x.status!='Cancelled').flatMap(x=>x.seats);
-const find=id=>DB.buses.find(b=>b.id==id);
-const dateOk=(d,t)=>new Date(d+'T'+t)>new Date();
-function nav(){$('#nav').innerHTML=`<b onclick="go('home')">Yatra Desk</b><button class="g" onclick="go('home')">Home</button><button onclick="go('book')">Book ticket</button><button class="g" onclick="go('about')">About</button><button class="g" onclick="go('contact')">Contact</button>`+(S.user?`<button class="g" onclick="go('mine')">My bookings</button><button class="g" onclick="S.user=null;toast('Logged out',false);go('home')">Log out</button>`:`<button class="g" onclick="go('login')">Log in / Sign up</button>`)+`<button class="o" onclick="S.admin?go('admin'):go('alogin')">Admin</button>`}
-function render(){nav();$('#app').innerHTML=V[S.view]()}
-const V={
-home:()=>`<div class="hero"><h1 class="rise" style="font-size:clamp(28px,6vw,48px)">Your Journey, Our Responsibility</h1><p class="rise" style="animation-delay:.15s">We work directly with trusted bus operators and list only the buses we manage, so every seat you see is one we can confirm.</p><button class="o rise" style="animation-delay:.3s;font-size:16px;padding:14px 28px" onclick="go('book')">Book ticket</button>${road()}</div>${services()}
+const $ = s => document.querySelector(s), today = new Date().toISOString().slice(0, 10), inr = n => '₹' + n.toLocaleString('en-IN');
+const seed = { buses: [
+        { id: 'B1', name: 'Kaveri Express', type: 'AC Sleeper', owner: 'Kaveri Travels', from: 'Chennai', to: 'Bengaluru', board: 'Koyambedu', drop: 'Majestic', dep: '22:00', dur: 390, price: 950, seats: 32, on: 1 },
+        { id: 'B2', name: 'Southern Star', type: 'AC Seater', owner: 'Star Lines', from: 'Chennai', to: 'Bengaluru', board: 'Guindy', drop: 'Silk Board', dep: '07:30', dur: 360, price: 720, seats: 40, on: 1 },
+        { id: 'B3', name: 'Pandian Sleeper', type: 'Non-AC Sleeper', owner: 'Pandian Bros', from: 'Chennai', to: 'Madurai', board: 'Koyambedu', drop: 'Mattuthavani', dep: '21:15', dur: 480, price: 800, seats: 30, on: 1 },
+        { id: 'B4', name: 'Kovai Comfort', type: 'Non-AC Seater', owner: 'Kovai Motors', from: 'Chennai', to: 'Coimbatore', board: 'Koyambedu', drop: 'Gandhipuram', dep: '20:00', dur: 450, price: 650, seats: 40, on: 1 },
+        { id: 'B5', name: 'Deccan Royal', type: 'AC Sleeper', owner: 'Deccan Travels', from: 'Bengaluru', to: 'Hyderabad', board: 'Madiwala', drop: 'LB Nagar', dep: '20:30', dur: 600, price: 1400, seats: 32, on: 1 }
+    ],
+    bookings: [], notes: [], users: [] };
 
-<datalist id="cities">${[...new Set(DB.buses.flatMap(b=>[b.from,b.to]))].map(c=>`<option>${c}</option>`).join('')}</datalist>
-<h2 style="margin-top:28px">Popular routes</h2><div class="grid">${[...new Set(DB.buses.filter(b=>b.on).map(b=>b.from+'|'+b.to))].map(r=>{const[a,b]=r.split('|');return`<button class="g card" style="margin:0;text-align:left" onclick="S.q.from='${a}';S.q.to='${b}';go('book')">${a} to ${b}</button>`}).join('')}</div>
+let DB;
+try {
+    DB = JSON.parse(localStorage.getItem('yd')) || seed;
+}
+catch (e) {
+    DB = seed;
+}
+const save = () => { try {
+    localStorage.setItem('yd', JSON.stringify(DB));
+}
+catch (e) { } };
+let S = { view: 'home', q: { from: 'Chennai', to: 'Bengaluru', date: today, n: 1 }, sel: [], bus: null, pax: [], f: {}, user: null, admin: false, atab: 'ov', tab: 'up', last: null, fail: 0 };
+const go = v => { S.view = v; render(); scrollTo(0, 0); };
+
+function toast(m, u) { if (u !== false && S.user)
+    DB.notes.unshift({ u: S.user.email, m, t: new Date().toLocaleString() }); save(); const e = document.createElement('div'); e.className = 'toast'; e.setAttribute('role', 'status'); e.textContent = m; document.body.append(e); setTimeout(() => e.remove(), 3500); }
+const arr = (b) => { const [h, m] = b.dep.split(':').map(Number), t = (h * 60 + m + b.dur) % 1440; return String(t / 60 | 0).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0'); };
+const taken = (id, d) => DB.bookings.filter(x => x.bus == id && x.date == d && x.status != 'Cancelled').flatMap(x => x.seats);
+const find = id => DB.buses.find(b => b.id == id);
+const dateOk = (d, t) => new Date(d + 'T' + t) > new Date();
+
+function nav() { $('#nav').innerHTML = `<b onclick="go('home')">Yatra Desk</b><button class="g" onclick="go('home')">Home</button><button onclick="go('book')">Book ticket</button><button class="g" onclick="go('about')">About</button><button class="g" onclick="go('contact')">Contact</button>` + (S.user ? `<button class="g" onclick="go('mine')">My bookings</button><button class="g" onclick="S.user=null;toast('Logged out',false);go('home')">Log out</button>` : `<button class="g" onclick="go('login')">Log in / Sign up</button>`) + `<button class="o" onclick="S.admin?go('admin'):go('alogin')">Admin</button>`; }
+
+function render() { nav(); $('#app').innerHTML = V[S.view](); }
+const V = {
+    home: () => `
+    <div class="hero">
+    <h1 class="rise" style="font-size:clamp(28px,6vw,48px)">Your Journey, Our Responsibility</h1>
+    <p class="rise" style="animation-delay:.15s">We work directly with trusted bus operators and list only the buses we manage, so every seat you see is one we can confirm.</p><button class="o rise" style="animation-delay:.3s;font-size:16px;padding:14px 28px" onclick="go('book')">Book ticket</button>${road()}</div>${services()}
+
+<datalist id="cities">${[...new Set(DB.buses.flatMap(b => [b.from, b.to]))].map(c => `<option>${c}</option>`).join('')}</datalist>
+
+    <h2 style="margin-top:28px">Popular routes</h2>
+    <div class="grid">${[...new Set(DB.buses.filter(b => b.on).map(b => b.from + '|' + b.to))].map(r => { const [a, b] = r.split('|'); return `<button class="g card" style="margin:0;text-align:left" onclick="S.q.from='${a}';S.q.to='${b}';go('book')">${a} to ${b}</button>`; }).join('')}</div>
 <h2 style="margin-top:28px">Why choose us</h2><div class="grid"><div class="card" style="margin:0"><b>Hand-picked operators</b><br>We vet every owner we list.</div><div class="card" style="margin:0"><b>Live seat map</b><br>Booked seats are locked instantly.</div><div class="card" style="margin:0"><b>Human support</b><br>Call us before and during your trip.</div></div>
-<h2 style="margin-top:28px">What travellers say</h2><div class="grid"><div class="card" style="margin:0">“Booked a Madurai sleeper in two minutes.” – Priya</div><div class="card" style="margin:0">“Cancelled and got a refund note right away.” – Arun</div></div>`,
-book:()=>`<h1>Book your ticket</h1><div class="card"><div class="grid"><div><label>From</label><input id="f" value="${S.q.from}" list="cities"></div><div><label>To</label><input id="t" value="${S.q.to}" list="cities"></div><div><label>Journey date</label><input id="d" type="date" min="${today}" value="${S.q.date}"></div><div><label>Passengers</label><input id="n" type="number" min="1" max="6" value="${S.q.n}"></div><button class="o" onclick="search()">Search buses</button></div></div><datalist id="cities">${[...new Set(DB.buses.flatMap(b=>[b.from,b.to]))].map(c=>`<option>${c}</option>`).join('')}</datalist>`,
-about:()=>`<h1>About us</h1><div class="card">We are a mediator between bus owners and passengers. We coordinate with selected operators, list the buses we manage, and give you one simple place to find and book a seat, with clear prices and reliable support.</div>`,
-contact:()=>`<h1>Contact us</h1><div class="card"><p>Phone +91 90000 00000<br>Email hello@yatradesk.example<br>Office: T. Nagar, Chennai</p><div style="height:140px;border-radius:12px;background:var(--line);display:grid;place-items:center;color:var(--mut)">Google Maps placeholder</div></div>
-<div class="card"><div class="grid"><div><label>Name</label><input id="cn"></div><div><label>Email</label><input id="ce" type="email"></div><div><label>Phone</label><input id="cp"></div></div><label style="margin-top:8px">Message</label><input id="cm"><br><br><button onclick="if(!$('#cn').value||!$('#cm').value)return toast('Enter your name and message',false);toast('Message sent. We reply within a day.',false);go('home')">Send message</button></div>`,
-login:()=>`<h1>Log in or sign up</h1><div class="card" style="max-width:420px"><label>Name (for sign up)</label><input id="ln"><label>Email</label><input id="le" type="email"><label>Password</label><input id="lp" type="password"><br><br><button onclick="auth(1)">Sign up</button> <button class="g" onclick="auth(0)">Log in</button><p class="np" style="color:var(--mut);font-size:12px">Demo: accounts are stored in this browser only; passwords are not hashed here (the real backend uses bcrypt).</p></div>`,
-results:()=>{const q=S.q,f=S.f;let l=DB.buses.filter(b=>b.on&&b.from.toLowerCase()==q.from.trim().toLowerCase()&&b.to.toLowerCase()==q.to.trim().toLowerCase());
-l=l.filter(b=>(!f.type||b.type==f.type)&&(!f.price||b.price<=f.price)&&(!f.seat||b.seats-taken(b.id,q.date).length>=q.n)&&(!f.time||(f.time=='m'?b.dep<'12:00':f.time=='e'?b.dep>='12:00'&&b.dep<'20:00':b.dep>='20:00')));
-return`<h1>${q.from} to ${q.to}</h1><p style="color:var(--mut)">${q.date} · ${q.n} passenger(s)</p><div class="card grid"><div><label>Bus type</label><select onchange="S.f.type=this.value;render()"><option value="">Any</option>${['AC Sleeper','Non-AC Sleeper','AC Seater','Non-AC Seater'].map(t=>`<option ${f.type==t?'selected':''}>${t}</option>`).join('')}</select></div><div><label>Departure</label><select onchange="S.f.time=this.value;render()"><option value="">Any</option><option value="m" ${f.time=='m'?'selected':''}>Before noon</option><option value="e" ${f.time=='e'?'selected':''}>Noon–8 pm</option><option value="n" ${f.time=='n'?'selected':''}>After 8 pm</option></select></div><div><label>Max price</label><select onchange="S.f.price=+this.value;render()"><option value="0">Any</option>${[700,900,1200].map(p=>`<option value="${p}" ${f.price==p?'selected':''}>${inr(p)}</option>`).join('')}</select></div><label style="display:flex;gap:8px"><input type="checkbox" style="width:auto" ${f.seat?'checked':''} onchange="S.f.seat=this.checked;render()">Enough seats for my group</label></div>`+
-(l.length?l.map(b=>{const left=b.seats-taken(b.id,q.date).length;return`<div class="card row"><div><h3>${b.name} <span class="tag">${b.type}</span></h3>${b.dep} → ${arr(b)} · ${Math.floor(b.dur/60)}h ${b.dur%60}m<br><span style="color:var(--mut)">${b.board} → ${b.drop}</span><br><span class="${left<6?'bad':'ok'}">${left} seats left</span></div><div style="text-align:right"><h2>${inr(b.price)}</h2><button onclick="pick('${b.id}')" ${left<q.n?'disabled':''}>View seats</button></div></div>`}).join(''):`<div class="card">No buses on this route yet. Try another date or a popular route, or call us and we will arrange one.</div>`)+`<button class="g" onclick="go('book')">Change search</button>`},
-seats:()=>{const b=S.bus,tk=taken(b.id,S.q.date),rows=Math.ceil(b.seats/4);let h='';for(let i=1;i<=b.seats;i++){const id=i,c=tk.includes(id)?'b':S.sel.includes(id)?'s':'';h+=`<button class="seat ${c}" ${c=='b'?'disabled':''} aria-pressed="${c=='s'}" onclick="tog(${id})">${id}</button>`;if(i%2==0&&i%4!=0)h+='<span></span>'}
-return`<h1>${b.name}</h1><p>${b.type} · ${S.q.from} to ${S.q.to} · ${S.q.date} · ${b.dep} → ${arr(b)}<br>Board at ${b.board}, drop at ${b.drop}</p><div class="card"><div class="seats">${h}</div><p style="text-align:center;font-size:12px;color:var(--mut)">Outlined: free · Amber: yours · Grey: booked (up to ${S.q.n} seats)</p></div><div class="card row"><div>Seats: <b>${S.sel.join(', ')||'none'}</b><br>Total <b>${inr(S.sel.length*b.price)}</b></div><button ${S.sel.length?'':'disabled'} onclick="S.pax=S.sel.map(()=>({}));go('pax')">Continue</button></div>`},
-pax:()=>`<h1>Passenger details</h1>${S.sel.map((s,i)=>`<div class="card"><b>Seat ${s}</b><div class="grid"><div><label>Name</label><input id="pn${i}"></div><div><label>Age</label><input id="pa${i}" type="number" min="1" max="110"></div><div><label>Gender</label><select id="pg${i}"><option>Female</option><option>Male</option><option>Other</option></select></div></div></div>`).join('')}
-<div class="card grid"><div><label>Contact email</label><input id="pe" type="email" value="${S.user?S.user.email:''}"></div><div><label>Mobile (10 digits)</label><input id="pm" inputmode="numeric"></div></div>
-<div class="card">Summary: ${S.bus.name}, ${S.q.date}, seats ${S.sel.join(', ')} · <b>${inr(S.sel.length*S.bus.price)}</b></div><button onclick="paxNext()">Go to payment</button>`,
-pay:()=>`<h1>Payment <span class="tag">DEMO ONLY</span></h1><div class="card">No real money moves and no card details are stored. Seats ${S.sel.join(', ')} are held for you while you pay.<h2>${inr(S.sel.length*S.bus.price)}</h2>
-<label>Method</label><select id="pmth"><option>UPI</option><option>Debit/Credit Card</option><option>Net Banking</option></select><label style="margin-top:8px">Simulate outcome</label><select id="pout"><option value="ok">Payment succeeds</option><option value="no">Payment fails</option></select><br>${S.fail?'<p class="bad">Last payment failed. Your seats are still held, so try again.</p>':''}<button class="o" onclick="doPay()">Pay now</button></div>`,
-proc:()=>`<div class="card" style="text-align:center"><div class="spin"></div>Processing demo payment…</div>`,
-ticket:()=>{const k=S.last,b=find(k.bus);return`<div class="card ticket"><div class="row"><h2>${b.name}</h2><span class="tag">${k.status}</span></div><b>PNR ${k.pnr}</b> · Txn ${k.txn}<p>${b.from} to ${b.to} · ${k.date} · ${b.dep} → ${arr(b)}<br>Board: ${b.board} · Drop: ${b.drop} · ${b.type}</p>${k.pax.map((p,i)=>`<div>Seat ${k.seats[i]}: ${p.n}, ${p.a}, ${p.g}</div>`).join('')}<h3>Paid ${inr(k.amt)} via ${k.mth}</h3></div><div class="np"><button onclick="print()">Print / save as PDF</button> <button class="g" onclick="go('mine')">My bookings</button></div>`},
-mine:()=>{if(!S.user)return V.login();const m=DB.bookings.filter(x=>x.u==S.user.email),up=x=>x.status!='Cancelled'&&dateOk(x.date,find(x.bus).dep),l=m.filter(x=>S.tab=='up'?up(x):S.tab=='done'?x.status!='Cancelled'&&!up(x):x.status=='Cancelled');
-return`<h1>My bookings</h1><div class="np">${[['up','Upcoming'],['done','Completed'],['can','Cancelled']].map(([k,t])=>`<button class="${S.tab==k?'':'g'}" onclick="S.tab='${k}';render()">${t}</button>`).join(' ')}</div>`+(l.map(x=>`<div class="card row"><div><b>${find(x.bus).name}</b> · ${x.date}<br>PNR ${x.pnr} · seats ${x.seats.join(', ')} · ${inr(x.amt)}</div><div><button onclick="S.last=DB.bookings.find(b=>b.pnr=='${x.pnr}');go('ticket')">Ticket</button> ${up(x)?`<button class="r" onclick="cancelB('${x.pnr}')">Cancel</button>`:''}</div></div>`).join('')||'<div class="card">Nothing here yet. Search for a bus to book your first trip.</div>')+`<h3>Notifications</h3>`+(DB.notes.filter(n=>n.u==S.user.email).slice(0,6).map(n=>`<div class="card" style="padding:10px">${n.m} <small style="color:var(--mut)">${n.t}</small></div>`).join('')||'<p>No notifications.</p>')},
-alogin:()=>`<h1>Admin login</h1><div class="card" style="max-width:380px"><label>Password</label><input id="ap" type="password"><br><br><button onclick="if($('#ap').value=='admin123'){S.admin=true;go('admin')}else toast('Wrong password',false)">Log in</button><p style="font-size:12px;color:var(--mut)">Demo password: admin123</p></div>`,
-admin:()=>{if(!S.admin)return V.alogin();const B=DB.bookings,live=B.filter(x=>x.status!='Cancelled'),t=S.atab;let c='';
-if(t=='ov')c=`<div class="grid">${[['Buses',DB.buses.length],['Routes',new Set(DB.buses.map(b=>b.from+b.to)).size],['Bookings',live.length],['Customers',DB.users.length],['Revenue',inr(live.reduce((a,x)=>a+x.amt,0))]].map(([k,v])=>`<div class="card" style="margin:0"><small>${k}</small><h2>${v}</h2></div>`).join('')}</div>`;
-if(t=='bus')c=`<div class="card"><h3>Add a bus</h3><div class="grid">${[['name','Bus name'],['reg','Registration no.'],['owner','Owner / operator'],['from','From'],['to','To'],['board','Boarding point'],['drop','Dropping point'],['dep','Departs (HH:MM)'],['dur','Duration (minutes)'],['price','Price (₹)'],['seats','Total seats']].map(([k,l])=>`<div><label>${l}</label><input id="a_${k}"></div>`).join('')}<div><label>Type</label><select id="a_type"><option>AC Sleeper</option><option>Non-AC Sleeper</option><option>AC Seater</option><option>Non-AC Seater</option></select></div></div><br><button onclick="addBus()">Save bus</button></div><div class="tbl"><table><tr><th>Bus</th><th>Route</th><th>Dep</th><th>Price</th><th></th></tr>${DB.buses.map(b=>`<tr><td>${b.name}<br><small>${b.owner}</small></td><td>${b.from}→${b.to}</td><td>${b.dep}</td><td>${inr(b.price)}</td><td><button class="g" onclick="find('${b.id}').on^=1;save();render()">${b.on?'Active':'Inactive'}</button><button class="r" onclick="DB.buses=DB.buses.filter(x=>x.id!='${b.id}');save();render()">Delete</button></td></tr>`).join('')}</table></div>`;
-if(t=='bk')c=`<div class="tbl"><table><tr><th>PNR</th><th>Customer</th><th>Bus / date</th><th>Seats</th><th>Status</th><th></th></tr>${B.map(x=>`<tr><td>${x.pnr}</td><td>${x.pax[0].n}<br><small>${x.email}</small></td><td>${find(x.bus)?.name} ${x.date}</td><td>${x.seats.join(',')}</td><td>${x.status}</td><td><button onclick="setSt('${x.pnr}','Confirmed')">Confirm</button> <button class="r" onclick="setSt('${x.pnr}','Cancelled')">Cancel</button></td></tr>`).join('')||'<tr><td>No bookings yet</td></tr>'}</table></div>`;
-return`<h1>Admin dashboard</h1><div class="np">${[['ov','Overview'],['bus','Manage buses'],['bk','Manage bookings']].map(([k,l])=>`<button class="${t==k?'':'g'}" onclick="S.atab='${k}';render()">${l}</button>`).join(' ')}<button class="g" onclick="S.admin=false;go('home')">Log out</button></div><br>${c}`}};
-const busSvg=c=>`<svg viewBox="0 0 220 96" role="img" aria-label="Bus illustration" style="width:100%"><rect x="6" y="10" width="200" height="60" rx="14" fill="${c}"/><rect x="170" y="18" width="30" height="30" rx="6" fill="#cfe6ff"/>${[0,1,2,3,4].map(i=>`<rect x="${20+i*30}" y="20" width="22" height="22" rx="4" fill="#cfe6ff"/>`).join('')}<rect x="6" y="52" width="200" height="6" fill="rgba(0,0,0,.18)"/><rect x="196" y="58" width="10" height="8" rx="2" fill="#ffd166"/>${[50,160].map(x=>`<g transform="translate(${x} 74)"><circle r="14" fill="#14213d"/><g class="wh"><circle r="7" fill="#e5e5e5"/><path d="M-7 0H7M0 -7V7" stroke="#14213d" stroke-width="2"/></g></g>`).join('')}</svg>`;
-const road=()=>`<div class="road" aria-hidden="true"><span class="cloud" style="top:10px;animation-delay:-3s"></span><span class="cloud" style="top:44px;width:50px;animation-delay:-9s"></span><div class="ln"></div><div class="drive">${busSvg('#ff9f1c')}</div></div>`;
-const services=()=>`<h2 style="margin-top:28px">What we do for you</h2><p style="color:var(--mut);max-width:60ch">We are the booking desk between you and bus owners. We arrange the bus, confirm your seat and stay reachable until you reach your stop.</p><div class="grid" style="align-items:stretch">${[['Verified buses','Every bus on our list is arranged with its owner, so your seat is real.'],['Pick your own seat','See the live seat map and choose where you sit.'],['Instant e-ticket','Get your ticket and PNR right after payment. Print it or save it as PDF.'],['Easy cancellation','Cancel from My Bookings up to 12 hours before departure.']].map(([t,d])=>`<div class="card fl" style="margin:0"><b>${t}</b><br><span style="color:var(--mut)">${d}</span></div>`).join('')}</div><h2 style="margin-top:28px">Our buses</h2><div class="grid" style="align-items:stretch">${[['AC Sleeper','#0b5fff','Lie-down berths for overnight trips.'],['AC Seater','#0a8f8f','Cool, comfortable day travel.'],['Non-AC Sleeper','#7c3aed','Budget berths for long routes.'],['Non-AC Seater','#e4572e','Simple, affordable short hops.']].map(([t,c,d])=>`<div class="card fl" style="margin:0">${busSvg(c)}<b>${t}</b><br><span style="color:var(--mut)">${d}</span></div>`).join('')}</div><h2 style="margin-top:28px">How booking works</h2><div class="grid" style="align-items:stretch">${['Search your route and date','Choose your seats','Pay (demo) and get your ticket','Board at your stop'].map((t,i)=>`<div class="card" style="margin:0"><b>${i+1}.</b> ${t}</div>`).join('')}</div><div style="text-align:center;margin-top:24px"><button class="o" style="font-size:16px;padding:14px 28px" onclick="go('book')">Book ticket</button></div>`;
-function search(){S.q={from:$('#f').value,to:$('#t').value,date:$('#d').value||today,n:Math.max(1,Math.min(6,+$('#n').value||1))};S.f={};if(!S.q.from||!S.q.to)return toast('Enter both cities',false);go('results')}
-function pick(id){S.bus=find(id);S.sel=[];go('seats')}
-function tog(i){if(taken(S.bus.id,S.q.date).includes(i))return;const k=S.sel.indexOf(i);if(k>-1)S.sel.splice(k,1);else if(S.sel.length<S.q.n)S.sel.push(i);else toast('You searched for '+S.q.n+' seat(s)',false);S.sel.sort((a,b)=>a-b);render()}
-function auth(up){const e=$('#le').value.trim().toLowerCase(),p=$('#lp').value,n=$('#ln').value.trim();if(!/^\S+@\S+\.\S+$/.test(e)||p.length<6)return toast('Use a valid email and a password of 6+ characters',false);let u=DB.users.find(x=>x.email==e);
-if(up){if(u||!n)return toast(u?'Account exists. Log in instead':'Enter your name',false);u={email:e,name:n,p};DB.users.push(u);S.user=u;toast('Welcome '+n+'! Registration successful.')}else{if(!u||u.p!=p)return toast('Wrong email or password',false);S.user=u;toast('Logged in',false)}save();go(S.bus&&S.sel.length?'pax':'home')}
-function paxNext(){if(!S.user){toast('Log in to continue booking',false);return go('login')}const pax=S.sel.map((_,i)=>({n:$('#pn'+i).value.trim(),a:+$('#pa'+i).value,g:$('#pg'+i).value})),em=$('#pe').value,ph=$('#pm').value;
-if(pax.some(p=>!p.n||!(p.a>0)))return toast('Enter every passenger’s name and age',false);if(!/^\S+@\S+\.\S+$/.test(em)||!/^\d{10}$/.test(ph))return toast('Check email and 10-digit mobile',false);S.pax=pax;S.em=em;S.ph=ph;S.fail=0;go('pay')}
-function doPay(){const out=$('#pout').value,mth=$('#pmth').value;go('proc');setTimeout(()=>{if(out=='no'){S.fail=1;toast('Payment failed. Seats were not booked.',false);return go('pay')}
-const tk=taken(S.bus.id,S.q.date);if(S.sel.some(s=>tk.includes(s))){toast('Sorry, a seat was just taken. Pick again.',false);S.sel=[];return go('seats')}
-const k={pnr:'YD'+Math.random().toString(36).slice(2,8).toUpperCase(),txn:'TXN'+Date.now(),bus:S.bus.id,date:S.q.date,seats:[...S.sel],pax:S.pax,email:S.em,phone:S.ph,u:S.user.email,amt:S.sel.length*S.bus.price,mth,status:'Confirmed'};DB.bookings.push(k);S.last=k;save();toast('Payment confirmed. Booking '+k.pnr+' is confirmed. Email sent (demo).');go('ticket')},1600)}
-function cancelB(p){const x=DB.bookings.find(b=>b.pnr==p),h=(new Date(x.date+'T'+find(x.bus).dep)-new Date())/36e5;if(h<12)return toast('Cancellation closes 12 hours before departure',false);if(!confirm('Cancel booking '+p+'? Refund: '+(h>48?'90%':'50%')))return;x.status='Cancelled';toast('Booking '+p+' cancelled. Refund started.');render()}
-function setSt(p,s){DB.bookings.find(b=>b.pnr==p).status=s;save();toast('Booking '+p+' marked '+s,false);render()}
-function addBus(){const g=k=>$('#a_'+k).value.trim(),b={id:'B'+Date.now(),name:g('name'),reg:g('reg'),owner:g('owner'),from:g('from'),to:g('to'),board:g('board'),drop:g('drop'),dep:g('dep'),dur:+g('dur'),price:+g('price'),seats:+g('seats'),type:$('#a_type').value,on:1};
-if(!b.name||!b.from||!b.to||!/^\d\d:\d\d$/.test(b.dep)||!(b.dur>0)||!(b.price>0)||!(b.seats>0&&b.seats<=60))return toast('Fill all fields: time as HH:MM, seats up to 60',false);DB.buses.push(b);save();toast('Bus added',false);render()}
+
+    <h2 style="margin-top:28px">What travellers say</h2>
+    <div class="grid">
+    <div class="card" style="margin:0">“Booked a Madurai sleeper in two minutes.” – Priya</div>
+    <div class="card" style="margin:0">“Cancelled and got a refund note right away.” – Arun</div></div>`,
+    book: () => `
+    <h1>Book your ticket</h1>
+    <div class="card">
+    <div class="grid">
+    <div>
+    <label>From</label><input id="f" value="${S.q.from}" list="cities"></div>
+    <div>
+    <label>To</label><input id="t" value="${S.q.to}" list="cities"></div>
+    <div>
+    <label>Journey date</label><input id="d" type="date" min="${today}" value="${S.q.date}"></div>
+    <div>
+    <label>Passengers</label><input id="n" type="number" min="1" max="6" value="${S.q.n}"></div><button class="o" onclick="search()">Search buses</button></div></div>
+    <datalist id="cities">${[...new Set(DB.buses.flatMap(b => [b.from, b.to]))].map(c => `<option>${c}</option>`).join('')}</datalist>`,
+    about: () => `
+    <h1>About us</h1>
+    <div class="card">We are a mediator between bus owners and passengers. We coordinate with selected operators, list the buses we manage, and give you one simple place to find and book a seat, with clear prices and reliable support.</div>`,
+    contact: () => `
+    <h1>Contact us</h1>
+    <div class="card">
+    <p>Phone +91 90000 00000<br>Email hello@yatradesk.example<br>Office: T. Nagar, Chennai</p>
+    <div style="height:140px;border-radius:12px;background:var(--line);display:grid;place-items:center;color:var(--mut)">Google Maps placeholder</div></div>
+
+    <div class="card">
+    <div class="grid">
+    <div>
+    <label>Name</label><input id="cn"></div>
+    <div>
+    <label>Email</label><input id="ce" type="email"></div>
+    <div>
+    <label>Phone</label><input id="cp"></div></div>
+    <label style="margin-top:8px">Message</label><input id="cm"><br><br><button onclick="if(!$('#cn').value||!$('#cm').value)return toast('Enter your name and message',false);toast('Message sent. We reply within a day.',false);go('home')">Send message</button></div>`,
+    login: () => `
+    <h1>Log in or sign up</h1>
+    <div class="card" style="max-width:420px">
+    <label>Name (for sign up)</label><input id="ln">
+    <label>Email</label><input id="le" type="email">
+    <label>Password</label><input id="lp" type="password"><br><br><button onclick="auth(1)">Sign up</button> <button class="g" onclick="auth(0)">Log in</button>
+    <p class="np" style="color:var(--mut);font-size:12px">Demo: accounts are stored in this browser only; passwords are not hashed here (the real backend uses bcrypt).</p></div>`,
+    results: () => {
+        const q = S.q, f = S.f;
+        let l = DB.buses.filter(b => b.on && b.from.toLowerCase() == q.from.trim().toLowerCase() && b.to.toLowerCase() == q.to.trim().toLowerCase());
+        l = l.filter(b => (!f.type || b.type == f.type) && (!f.price || b.price <= f.price) && (!f.seat || b.seats - taken(b.id, q.date).length >= q.n) && (!f.time || (f.time == 'm' ? b.dep < '12:00' : f.time == 'e' ? b.dep >= '12:00' && b.dep < '20:00' : b.dep >= '20:00')));
+        return `
+    <h1>${q.from} to ${q.to}</h1>
+    <p style="color:var(--mut)">${q.date} · ${q.n} passenger(s)</p>
+    <div class="card grid">
+    <div>
+    <label>Bus type</label><select onchange="S.f.type=this.value;render()"><option value="">Any</option>${['AC Sleeper', 'Non-AC Sleeper', 'AC Seater', 'Non-AC Seater'].map(t => `<option ${f.type == t ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+    <div>
+    <label>Departure</label><select onchange="S.f.time=this.value;render()"><option value="">Any</option><option value="m" ${f.time == 'm' ? 'selected' : ''}>Before noon</option><option value="e" ${f.time == 'e' ? 'selected' : ''}>Noon–8 pm</option><option value="n" ${f.time == 'n' ? 'selected' : ''}>After 8 pm</option></select></div>
+    <div>
+    <label>Max price</label><select onchange="S.f.price=+this.value;render()"><option value="0">Any</option>${[700, 900, 1200].map(p => `<option value="${p}" ${f.price == p ? 'selected' : ''}>${inr(p)}</option>`).join('')}</select></div>
+    <label style="display:flex;gap:8px"><input type="checkbox" style="width:auto" ${f.seat ? 'checked' : ''} onchange="S.f.seat=this.checked;render()">Enough seats for my group</label></div>` +
+            (l.length ? l.map(b => { const left = b.seats - taken(b.id, q.date).length; return `
+    <div class="card row">
+    <div>
+    <h3>${b.name} <span class="tag">${b.type}</span></h3>${b.dep} → ${arr(b)} · ${Math.floor(b.dur / 60)}h ${b.dur % 60}m<br><span style="color:var(--mut)">${b.board} → ${b.drop}</span><br><span class="${left < 6 ? 'bad' : 'ok'}">${left} seats left</span></div>
+    <div style="text-align:right">
+    <h2>${inr(b.price)}</h2><button onclick="pick('${b.id}')" ${left < q.n ? 'disabled' : ''}>View seats</button></div></div>`; }).join('') : `
+    <div class="card">No buses on this route yet. Try another date or a popular route, or call us and we will arrange one.</div>`) + `<button class="g" onclick="go('book')">Change search</button>`;
+    },
+    seats: () => {
+        const b = S.bus, tk = taken(b.id, S.q.date), rows = Math.ceil(b.seats / 4);
+        let h = '';
+        for (let i = 1; i <= b.seats; i++) {
+            const id = i, c = tk.includes(id) ? 'b' : S.sel.includes(id) ? 's' : '';
+            h += `<button class="seat ${c}" ${c == 'b' ? 'disabled' : ''} aria-pressed="${c == 's'}" onclick="tog(${id})">${id}</button>`;
+            if (i % 2 == 0 && i % 4 != 0)
+                h += `<span></span>`;
+        }
+        return `
+    <h1>${b.name}</h1>
+    <p>${b.type} · ${S.q.from} to ${S.q.to} · ${S.q.date} · ${b.dep} → ${arr(b)}<br>Board at ${b.board}, drop at ${b.drop}</p>
+    <div class="card">
+    <div class="seats">${h}</div>
+    <p style="text-align:center;font-size:12px;color:var(--mut)">Outlined: free · Amber: yours · Grey: booked (up to ${S.q.n} seats)</p></div>
+    <div class="card row">
+    <div>Seats: <b>${S.sel.join(', ') || 'none'}</b><br>Total <b>${inr(S.sel.length * b.price)}</b></div><button ${S.sel.length ? '' : 'disabled'} onclick="S.pax=S.sel.map(()=>({}));go('pax')">Continue</button></div>`;
+    },
+    pax: () => `
+    <h1>Passenger details</h1>${S.sel.map((s, i) => `
+    <div class="card"><b>Seat ${s}</b>
+    <div class="grid">
+    <div>
+    <label>Name</label><input id="pn${i}"></div>
+    <div>
+    <label>Age</label><input id="pa${i}" type="number" min="1" max="110"></div>
+    <div>
+    <label>Gender</label><select id="pg${i}"><option>Female</option><option>Male</option><option>Other</option></select></div></div></div>`).join('')}
+<div class="card grid"><div><label>Contact email</label><input id="pe" type="email" value="${S.user ? S.user.email : ''}"></div><div><label>Mobile (10 digits)</label><input id="pm" inputmode="numeric"></div></div>
+
+    <div class="card">Summary: ${S.bus.name}, ${S.q.date}, seats ${S.sel.join(', ')} · <b>${inr(S.sel.length * S.bus.price)}</b></div><button onclick="paxNext()">Go to payment</button>`,
+    pay: () => `
+    <h1>Payment <span class="tag">DEMO ONLY</span></h1>
+    <div class="card">No real money moves and no card details are stored. Seats ${S.sel.join(', ')} are held for you while you pay.
+    <h2>${inr(S.sel.length * S.bus.price)}</h2>
+
+    <label>Method</label><select id="pmth"><option>UPI</option><option>Debit/Credit Card</option><option>Net Banking</option></select>
+    <label style="margin-top:8px">Simulate outcome</label><select id="pout"><option value="ok">Payment succeeds</option><option value="no">Payment fails</option></select><br>${S.fail ? `
+    <p class="bad">Last payment failed. Your seats are still held, so try again.</p>` : ''}<button class="o" onclick="doPay()">Pay now</button></div>`,
+    proc: () => `<div class="card" style="text-align:center"><div class="spin"></div>Processing demo payment…</div>`,
+    ticket: () => { const k = S.last, b = find(k.bus); return `
+    <div class="card ticket">
+    <div class="row">
+    <h2>${b.name}</h2><span class="tag">${k.status}</span></div><b>PNR ${k.pnr}</b> · Txn ${k.txn}
+    <p>${b.from} to ${b.to} · ${k.date} · ${b.dep} → ${arr(b)}<br>Board: ${b.board} · Drop: ${b.drop} · ${b.type}</p>${k.pax.map((p, i) => `
+    <div>Seat ${k.seats[i]}: ${p.n}, ${p.a}, ${p.g}</div>`).join('')}
+    <h3>Paid ${inr(k.amt)} via ${k.mth}</h3></div>
+    <div class="np"><button onclick="print()">Print / save as PDF</button> <button class="g" onclick="go('mine')">My bookings</button></div>`; },
+    mine: () => {
+        if (!S.user)
+            return V.login();
+        const m = DB.bookings.filter(x => x.u == S.user.email), up = x => x.status != 'Cancelled' && dateOk(x.date, find(x.bus).dep), l = m.filter(x => S.tab == 'up' ? up(x) : S.tab == 'done' ? x.status != 'Cancelled' && !up(x) : x.status == 'Cancelled');
+        return `
+    <h1>My bookings</h1>
+    <div class="np">${[['up', 'Upcoming'], ['done', 'Completed'], ['can', 'Cancelled']].map(([k, t]) => `<button class="${S.tab == k ? '' : 'g'}" onclick="S.tab='${k}';render()">${t}</button>`).join(' ')}</div>` + (l.map(x => `
+    <div class="card row">
+    <div><b>${find(x.bus).name}</b> · ${x.date}<br>PNR ${x.pnr} · seats ${x.seats.join(', ')} · ${inr(x.amt)}</div>
+    <div><button onclick="S.last=DB.bookings.find(b=>b.pnr=='${x.pnr}');go('ticket')">Ticket</button> ${up(x) ? `<button class="r" onclick="cancelB('${x.pnr}')">Cancel</button>` : ''}</div></div>`).join('') || `
+    <div class="card">Nothing here yet. Search for a bus to book your first trip.</div>`) + `
+    <h3>Notifications</h3>` + (DB.notes.filter(n => n.u == S.user.email).slice(0, 6).map(n => `
+    <div class="card" style="padding:10px">${n.m} <small style="color:var(--mut)">${n.t}</small></div>`).join('') || `
+    <p>No notifications.</p>`);
+    },
+    alogin: () => `
+    <h1>Admin login</h1>
+    <div class="card" style="max-width:380px">
+    <label>Password</label><input id="ap" type="password"><br><br><button onclick="if($('#ap').value=='admin123'){S.admin=true;go('admin')}else toast('Wrong password',false)">Log in</button>
+    <p style="font-size:12px;color:var(--mut)">Demo password: admin123</p></div>`,
+    admin: () => {
+        if (!S.admin)
+            return V.alogin();
+        const B = DB.bookings, live = B.filter(x => x.status != 'Cancelled'), t = S.atab;
+        let c = '';
+        if (t == 'ov')
+            c = `
+    <div class="grid">${[['Buses', DB.buses.length], ['Routes', new Set(DB.buses.map(b => b.from + b.to)).size], ['Bookings', live.length], ['Customers', DB.users.length], ['Revenue', inr(live.reduce((a, x) => a + x.amt, 0))]].map(([k, v]) => `
+    <div class="card" style="margin:0"><small>${k}</small>
+    <h2>${v}</h2></div>`).join('')}</div>`;
+        if (t == 'bus')
+            c = `
+    <div class="card">
+    <h3>Add a bus</h3>
+    <div class="grid">${[['name', 'Bus name'], ['reg', 'Registration no.'], ['owner', 'Owner / operator'], ['from', 'From'], ['to', 'To'], ['board', 'Boarding point'], ['drop', 'Dropping point'], ['dep', 'Departs (HH:MM)'], ['dur', 'Duration (minutes)'], ['price', 'Price (₹)'], ['seats', 'Total seats']].map(([k, l]) => `
+    <div>
+    <label>${l}</label><input id="a_${k}"></div>`).join('')}
+    <div>
+    <label>Type</label><select id="a_type"><option>AC Sleeper</option><option>Non-AC Sleeper</option><option>AC Seater</option><option>Non-AC Seater</option></select></div></div><br><button onclick="addBus()">Save bus</button></div>
+    <div class="tbl">
+    <table>
+    <tr><th>Bus</th><th>Route</th><th>Dep</th><th>Price</th><th></th></tr>${DB.buses.map(b => `
+    <tr><td>${b.name}<br><small>${b.owner}</small></td><td>${b.from}→${b.to}</td><td>${b.dep}</td><td>${inr(b.price)}</td><td><button class="g" onclick="find('${b.id}').on^=1;save();render()">${b.on ? 'Active' : 'Inactive'}</button><button class="r" onclick="DB.buses=DB.buses.filter(x=>x.id!='${b.id}');save();render()">Delete</button></td></tr>`).join('')}</table></div>`;
+        if (t == 'bk')
+            c = `
+    <div class="tbl">
+    <table>
+    <tr><th>PNR</th><th>Customer</th><th>Bus / date</th><th>Seats</th><th>Status</th><th></th></tr>${B.map(x => `
+    <tr><td>${x.pnr}</td><td>${x.pax[0].n}<br><small>${x.email}</small></td><td>${find(x.bus)?.name} ${x.date}</td><td>${x.seats.join(',')}</td><td>${x.status}</td><td><button onclick="setSt('${x.pnr}','Confirmed')">Confirm</button> <button class="r" onclick="setSt('${x.pnr}','Cancelled')">Cancel</button></td></tr>`).join('') || `
+    <tr><td>No bookings yet</td></tr>`}</table></div>`;
+        return `
+    <h1>Admin dashboard</h1>
+    <div class="np">${[['ov', 'Overview'], ['bus', 'Manage buses'], ['bk', 'Manage bookings']].map(([k, l]) => `<button class="${t == k ? '' : 'g'}" onclick="S.atab='${k}';render()">${l}</button>`).join(' ')}<button class="g" onclick="S.admin=false;go('home')">Log out</button></div><br>${c}`;
+    }
+};
+const busSvg = c => `
+    <svg viewBox="0 0 220 96" role="img" aria-label="Bus illustration" style="width:100%">
+    <rect x="6" y="10" width="200" height="60" rx="14" fill="${c}"/>
+    <rect x="170" y="18" width="30" height="30" rx="6" fill="#cfe6ff"/>${[0, 1, 2, 3, 4].map(i => `
+    <rect x="${20 + i * 30}" y="20" width="22" height="22" rx="4" fill="#cfe6ff"/>`).join('')}
+    <rect x="6" y="52" width="200" height="6" fill="rgba(0,0,0,.18)"/>
+    <rect x="196" y="58" width="10" height="8" rx="2" fill="#ffd166"/>${[50, 160].map(x => `
+    <g transform="translate(${x} 74)"><circle r="14" fill="#14213d"/>
+    <g class="wh"><circle r="7" fill="#e5e5e5"/><path d="M-7 0H7M0 -7V7" stroke="#14213d" stroke-width="2"/></g></g>`).join('')}</svg>`;
+const road = () => `
+    <div class="road" aria-hidden="true"><span class="cloud" style="top:10px;animation-delay:-3s"></span><span class="cloud" style="top:44px;width:50px;animation-delay:-9s"></span>
+    <div class="ln"></div>
+    <div class="drive">${busSvg('#ff9f1c')}</div></div>`;
+const services = () => `
+    <h2 style="margin-top:28px">What we do for you</h2>
+    <p style="color:var(--mut);max-width:60ch">We are the booking desk between you and bus owners. We arrange the bus, confirm your seat and stay reachable until you reach your stop.</p>
+    <div class="grid" style="align-items:stretch">${[['Verified buses', 'Every bus on our list is arranged with its owner, so your seat is real.'], ['Pick your own seat', 'See the live seat map and choose where you sit.'], ['Instant e-ticket', 'Get your ticket and PNR right after payment. Print it or save it as PDF.'], ['Easy cancellation', 'Cancel from My Bookings up to 12 hours before departure.']].map(([t, d]) => `
+    <div class="card fl" style="margin:0"><b>${t}</b><br><span style="color:var(--mut)">${d}</span></div>`).join('')}</div>
+    <h2 style="margin-top:28px">Our buses</h2>
+    <div class="grid" style="align-items:stretch">${[['AC Sleeper', '#0b5fff', 'Lie-down berths for overnight trips.'], ['AC Seater', '#0a8f8f', 'Cool, comfortable day travel.'], ['Non-AC Sleeper', '#7c3aed', 'Budget berths for long routes.'], ['Non-AC Seater', '#e4572e', 'Simple, affordable short hops.']].map(([t, c, d]) => `
+    <div class="card fl" style="margin:0">${busSvg(c)}<b>${t}</b><br><span style="color:var(--mut)">${d}</span></div>`).join('')}</div>
+    <h2 style="margin-top:28px">How booking works</h2>
+    <div class="grid" style="align-items:stretch">${['Search your route and date', 'Choose your seats', 'Pay (demo) and get your ticket', 'Board at your stop'].map((t, i) => `
+    <div class="card" style="margin:0"><b>${i + 1}.</b> ${t}</div>`).join('')}</div>
+    <div style="text-align:center;margin-top:24px"><button class="o" style="font-size:16px;padding:14px 28px" onclick="go('book')">Book ticket</button></div>`;
+
+function search() { S.q = { from: $('#f').value, to: $('#t').value, date: $('#d').value || today, n: Math.max(1, Math.min(6, +$('#n').value || 1)) }; S.f = {}; if (!S.q.from || !S.q.to)
+    return toast('Enter both cities', false); go('results'); }
+
+function pick(id) { S.bus = find(id); S.sel = []; go('seats'); }
+
+function tog(i) { if (taken(S.bus.id, S.q.date).includes(i))
+    return; const k = S.sel.indexOf(i); if (k > -1)
+    S.sel.splice(k, 1);
+else if (S.sel.length < S.q.n)
+    S.sel.push(i);
+else
+    toast('You searched for ' + S.q.n + ' seat(s)', false); S.sel.sort((a, b) => a - b); render(); }
+
+function auth(up) {
+    const e = $('#le').value.trim().toLowerCase(), p = $('#lp').value, n = $('#ln').value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(e) || p.length < 6)
+        return toast('Use a valid email and a password of 6+ characters', false);
+    let u = DB.users.find(x => x.email == e);
+    if (up) {
+        if (u || !n)
+            return toast(u ? 'Account exists. Log in instead' : 'Enter your name', false);
+        u = { email: e, name: n, p };
+        DB.users.push(u);
+        S.user = u;
+        toast('Welcome ' + n + '! Registration successful.');
+    }
+    else {
+        if (!u || u.p != p)
+            return toast('Wrong email or password', false);
+        S.user = u;
+        toast('Logged in', false);
+    }
+    save();
+    go(S.bus && S.sel.length ? 'pax' : 'home');
+}
+
+function paxNext() {
+    if (!S.user) {
+        toast('Log in to continue booking', false);
+        return go('login');
+    }
+    const pax = S.sel.map((_, i) => ({ n: $('#pn' + i).value.trim(), a: +$('#pa' + i).value, g: $('#pg' + i).value })), em = $('#pe').value, ph = $('#pm').value;
+    if (pax.some(p => !p.n || !(p.a > 0)))
+        return toast('Enter every passenger’s name and age', false);
+    if (!/^\S+@\S+\.\S+$/.test(em) || !/^\d{10}$/.test(ph))
+        return toast('Check email and 10-digit mobile', false);
+    S.pax = pax;
+    S.em = em;
+    S.ph = ph;
+    S.fail = 0;
+    go('pay');
+}
+
+function doPay() {
+    const out = $('#pout').value, mth = $('#pmth').value;
+    go('proc');
+    setTimeout(() => {
+        if (out == 'no') {
+            S.fail = 1;
+            toast('Payment failed. Seats were not booked.', false);
+            return go('pay');
+        }
+        const tk = taken(S.bus.id, S.q.date);
+        if (S.sel.some(s => tk.includes(s))) {
+            toast('Sorry, a seat was just taken. Pick again.', false);
+            S.sel = [];
+            return go('seats');
+        }
+        const k = { pnr: 'YD' + Math.random().toString(36).slice(2, 8).toUpperCase(), txn: 'TXN' + Date.now(), bus: S.bus.id, date: S.q.date, seats: [...S.sel], pax: S.pax, email: S.em, phone: S.ph, u: S.user.email, amt: S.sel.length * S.bus.price, mth, status: 'Confirmed' };
+        DB.bookings.push(k);
+        S.last = k;
+        save();
+        toast('Payment confirmed. Booking ' + k.pnr + ' is confirmed. Email sent (demo).');
+        go('ticket');
+    }, 1600);
+}
+
+function cancelB(p) { const x = DB.bookings.find(b => b.pnr == p), h = (new Date(x.date + 'T' + find(x.bus).dep) - new Date()) / 36e5; if (h < 12)
+    return toast('Cancellation closes 12 hours before departure', false); if (!confirm('Cancel booking ' + p + '? Refund: ' + (h > 48 ? '90%' : '50%')))
+    return; x.status = 'Cancelled'; toast('Booking ' + p + ' cancelled. Refund started.'); render(); }
+
+function setSt(p, s) { DB.bookings.find(b => b.pnr == p).status = s; save(); toast('Booking ' + p + ' marked ' + s, false); render(); }
+
+function addBus() {
+    const g = k => $('#a_' + k).value.trim(), b = { id: 'B' + Date.now(), name: g('name'), reg: g('reg'), owner: g('owner'), from: g('from'), to: g('to'), board: g('board'), drop: g('drop'), dep: g('dep'), dur: +g('dur'), price: +g('price'), seats: +g('seats'), type: $('#a_type').value, on: 1 };
+    if (!b.name || !b.from || !b.to || !/^\d\d:\d\d$/.test(b.dep) || !(b.dur > 0) || !(b.price > 0) || !(b.seats > 0 && b.seats <= 60))
+        return toast('Fill all fields: time as HH:MM, seats up to 60', false);
+    DB.buses.push(b);
+    save();
+    toast('Bus added', false);
+    render();
+}
 render();
